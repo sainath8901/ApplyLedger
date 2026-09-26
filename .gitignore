@@ -1,0 +1,7 @@
+release/
+node_modules/
+.env
+.env.*
+*.pem
+*.key
+tests/tmp-*/

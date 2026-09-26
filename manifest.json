@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "ApplyLedger - Internal Job Tracker",
+  "version": "2.0.1",
+  "description": "Local application tracking, profiles, status history and admin reporting.",
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab",
+    "alarms",
+    "identity"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "options_page": "dashboard.html",
+  "optional_permissions": [
+    "notifications"
+  ],
+  "icons": {
+    "128": "icon128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtjGcYxr+EDFkZSYF3+rZbRLfTU+m1/49a81kEnIo0C60VIWjdWyBjNrNem2yqrYnqorI+OQOupcosp/+Q23BviWZIUU/zrgi9MzIT+26NhW6DIK3JaNYAHZ9eRTAbYNfB/aQnv0zH5oIJAxQjzsudWXviGyFUATHSla+ajC7+3Pp8sB/BE+Od8k/2G9kt4lS2J50cmmFIiV0QGJXJuDYD61yWyltl/7r/pVV8ZO8aZTtYJYfLWu6+P9jHaOCC5Cm2iNhhdEJp5MgZE/19VYUvNN6kWQ8a2BcPztS5WdAlBK+g9Uida2qASrB34ITnBKRLyPZP2DKonz6TYCmI0fHbwIDAQAB"
+}

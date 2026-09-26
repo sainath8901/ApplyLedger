@@ -1,0 +1,1 @@
+{"name":"applyledger","version":"2.0.0","private":true,"type":"module","scripts":{"start":"node server/server.js","test":"node --test tests/auth.test.mjs tests/worker.test.mjs"},"engines":{"node":">=24"}}

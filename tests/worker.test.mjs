@@ -1,0 +1,30 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,copyFile,writeFile,rm} from 'node:fs/promises';import {dirname,join,resolve} from 'node:path';import {fileURLToPath,pathToFileURL} from 'node:url';
+test('worker Google login, profile boundaries, locked jobs and RPC forwarding',async()=>{
+ const base=dirname(fileURLToPath(import.meta.url)),temp=await mkdtemp(join(base,'tmp-'));const root=resolve(base,'..');
+ const local={},session={};let listener;const area=data=>({get:async keys=>Object.fromEntries((typeof keys==='string'?[keys]:keys).filter(k=>k in data).map(k=>[k,structuredClone(data[k])])),set:async values=>Object.assign(data,structuredClone(values)),remove:async keys=>(Array.isArray(keys)?keys:[keys]).forEach(k=>delete data[k]),setAccessLevel:async()=>{}});
+ const oldFetch=globalThis.fetch;let serverRole='member';const userId='11111111-1111-4111-8111-111111111111';
+ globalThis.fetch=async(url,opts)=>{assert.ok(url.startsWith('https://test.supabase.co/'));let data;
+ if(url.includes('/token?'))data={access_token:'test',refresh_token:'test-refresh',expires_in:3600,user:{id:userId,email:'member@gmail.com'}};
+ else if(url.endsWith('/ledger_me'))data={id:userId,name:'Member',email:'member@gmail.com',role:serverRole};
+ else if(url.endsWith('/ledger_sync'))data={syncedAt:new Date().toISOString()};
+ else if(url.includes('/logout?'))data={};
+ else if(url.endsWith('/ledger_set_admin'))return new Response(JSON.stringify({message:'Access denied'}),{status:403});
+ else if(url.endsWith('/ledger_my_requests'))data=[];
+ else throw Error('Unexpected request: '+url);
+ return new Response(JSON.stringify(data),{status:200});};
+ globalThis.chrome={storage:{local:area(local),session:area(session)},runtime:{getURL:p=>'chrome-extension://test/'+p,onMessage:{addListener:f=>listener=f},onStartup:{addListener:()=>{}},onInstalled:{addListener:()=>{}}},action:{setBadgeText:async()=>{}},identity:{getRedirectURL:p=>'https://test.chromiumapp.org/'+p,launchWebAuthFlow:async()=> 'https://test.chromiumapp.org/google?code=abc'},alarms:{create:async()=>{},onAlarm:{addListener:()=>{}}}};
+ try{for(const name of ['background.js','core.js','auth.js'])await copyFile(join(root,name),join(temp,name));await writeFile(join(temp,'config.js'),"export const CONFIG={supabaseUrl:'https://test.supabase.co',publishableKey:'sb_publishable_test'};");await import(pathToFileURL(join(temp,'background.js')).href);
+ const call=(m,sender={url:'chrome-extension://test/dashboard.html'})=>new Promise(resolve=>listener(m,sender,resolve));
+ assert.ok((await call({type:'createProfile',name:'Admin',pin:'123456'})).error);assert.ok((await call({type:'add',data:{title:'No auth'}})).error);
+ assert.ok((await call({type:'googleLogin'},{url:'https://malicious.example',tab:{id:1}})).error);
+ await call({type:'googleLogin'});assert.equal((await call({type:'state'})).data.user.role,'member');
+ await call({type:'savePage',data:{title:'Locked job',url:'https://test.com/job/1'}});const job=local.dbV2.jobs[0];assert.equal(job.history[0].status,'Saved');
+ assert.match((await call({type:'edit',id:job.id,data:{title:'Changed'}})).error,/locked/);
+ assert.ok((await call({type:'status',id:job.id,status:'Accepted'},{url:'https://test.com/job/1',tab:{id:1}})).error);
+ await call({type:'capture',stage:'attempt',data:{title:'Title'}},{url:'https://test.com/job/1',tab:{id:1}});await call({type:'capture',stage:'confirmed'},{url:'https://test.com/job/1',tab:{id:1}});assert.equal(local.dbV2.jobs.length,1);assert.equal(local.dbV2.jobs[0].history.at(-1).status,'Submitted');
+ await Promise.all(Array.from({length:5},(_,i)=>call({type:'add',data:{title:'Job '+i}})));assert.equal(local.dbV2.jobs.length,6);
+ local.dbV2.profiles[0].role='owner';assert.match((await call({type:'setAdmin',args:{p_user:userId,p_admin:true}})).error,/Access denied/);
+ local.dbV2.jobs.push({...job,id:'another-job',profileId:'another-user'});assert.equal((await call({type:'state'})).data.jobs.length,6);
+ await call({type:'logout'});assert.equal((await call({type:'state'})).data.jobs.length,0);assert.equal(local.googleSession,undefined);
+ }finally{globalThis.fetch=oldFetch;const target=resolve(temp);assert.ok(target.startsWith(resolve(base)+ '\\tmp-')||target.startsWith(resolve(base)+'/tmp-'));await rm(target,{recursive:true,force:true});}
+});
